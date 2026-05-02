@@ -11,8 +11,7 @@ self.addEventListener('push', function(event) {
 
   const title = data.title || 'Reminder';
   const options = {
-    body: data.body || 'You have an upcoming appointment',
-    icon: '/sms/icon.png'
+    body: data.body || 'You have an upcoming appointment'
   };
 
   event.waitUntil(
