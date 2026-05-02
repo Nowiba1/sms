@@ -1,0 +1,47 @@
+name: Appointment Scheduler
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+
+jobs:
+  run-scheduler:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check time — skip if between 00:00 and 07:30 UTC
+        id: check_time
+        run: |
+          HOUR=$(date -u +%H)
+          MIN=$(date -u +%M)
+          TOTAL=$((HOUR * 60 + MIN))
+          if [ $TOTAL -lt 450 ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout repo
+        if: steps.check_time.outputs.skip == 'false'
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        if: steps.check_time.outputs.skip == 'false'
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        if: steps.check_time.outputs.skip == 'false'
+        run: npm install
+
+      - name: Ping Render to keep it awake
+        if: steps.check_time.outputs.skip == 'false'
+        run: |
+          curl -s ${{ secrets.RENDER_URL }}/health || echo "Ping failed but continuing"
+
+      - name: Run scheduler
+        if: steps.check_time.outputs.skip == 'false'
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: node scheduler.js
