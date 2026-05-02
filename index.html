@@ -77,7 +77,7 @@ const firebaseConfig = {
         }
 
         // Step 2: Register the service worker
-        const registration = await navigator.serviceWorker.register('/sw.js');
+        const registration = await navigator.serviceWorker.register('/sms/sw.js');
 
         // Step 3: Get FCM token
         const fcmToken = await getToken(messaging, {
