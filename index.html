@@ -1,20 +1,41 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Rendez-vous</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Book an Appointment</title>
+  <style>
+    body { font-family: sans-serif; max-width: 480px; margin: 60px auto; padding: 0 20px; }
+    input { display: block; width: 100%; margin: 8px 0 16px; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; box-sizing: border-box; }
+    button { background: #4f46e5; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-size: 16px; cursor: pointer; width: 100%; }
+    #status { margin-top: 16px; padding: 12px; border-radius: 6px; display: none; }
+    .success { background: #d1fae5; color: #065f46; }
+    .error   { background: #fee2e2; color: #991b1b; }
+  </style>
 </head>
 <body>
 
-<h2>Prendre un rendez-vous</h2>
+  <h2>Book an Appointment</h2>
+  <p>You'll receive a push notification 30 minutes before your appointment.</p>
 
-<input type="datetime-local" id="time">
-<button onclick="book()">Réserver</button>
+  <label>Your name</label>
+  <input type="text" id="name" placeholder="e.g. Ahmed Ben Ali">
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging.js";
+  <label>Email</label>
+  <input type="email" id="email" placeholder="you@example.com">
 
-// 🔑 CONFIG FIREBASE (remplace)
+  <label>Appointment date & time</label>
+  <input type="datetime-local" id="datetime">
+
+  <button onclick="bookAppointment()">Book Appointment</button>
+  <div id="status"></div>
+
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js';
+    import { getMessaging, getToken } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging.js';
+
+    // ⚠️ Replace these values with YOUR Firebase project config
 const firebaseConfig = {
   apiKey: "AIzaSyBaNjHmi-VlW8aFDDVN38OJkQCShYY2sFg",
   authDomain: "dominos-ftw.firebaseapp.com",
@@ -26,46 +47,72 @@ const firebaseConfig = {
   measurementId: "G-1TBL91595F"
 };
 
-const app = initializeApp(firebaseConfig);
-const messaging = getMessaging(app);
+    // ⚠️ Replace with your VAPID key from Firebase Console
+    // Project Settings → Cloud Messaging → Web Push certificates → Key pair
+    const VAPID_KEY = "BEWecP7ritb9sf4DvsXlx9pMZmVcKZWFZ29C72DclYQjruwRweL5HSOgjMcr2Q_2bJ-2APNYdP9kXUs1fd2ZAjA";
 
-let userToken = null;
+    // ⚠️ Replace with your Render backend URL
+    const BACKEND_URL = "https://YOUR_RENDER_APP.onrender.com";
 
-// 🔔 demander permission + récupérer token
-async function initPush() {
-  const permission = await Notification.requestPermission();
+    const app = initializeApp(firebaseConfig);
+    const messaging = getMessaging(app);
 
-  if (permission === "granted") {
-    userToken = await getToken(messaging, {
-      vapidKey: "BEWecP7ritb9sf4DvsXlx9pMZmVcKZWFZ29C72DclYQjruwRweL5HSOgjMcr2Q_2bJ-2APNYdP9kXUs1fd2ZAjA"
-    });
+    window.bookAppointment = async function() {
+      const name = document.getElementById('name').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const datetime = document.getElementById('datetime').value;
+      const status = document.getElementById('status');
 
-    console.log("TOKEN:", userToken);
-  } else {
-    alert("Notifications refusées");
-  }
-}
+      if (!name || !email || !datetime) {
+        showStatus('Please fill in all fields.', 'error');
+        return;
+      }
 
-await initPush();
+      try {
+        // Step 1: Ask user for notification permission
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          showStatus('Please allow notifications to get reminders.', 'error');
+          return;
+        }
 
-// 📅 réserver rendez-vous
-window.book = async function () {
-  const time = document.getElementById("time").value;
+        // Step 2: Register the service worker
+        const registration = await navigator.serviceWorker.register('/sw.js');
 
-  if (!time) return alert("Choisir une date");
+        // Step 3: Get FCM token
+        const fcmToken = await getToken(messaging, {
+          vapidKey: VAPID_KEY,
+          serviceWorkerRegistration: registration
+        });
 
-  await fetch("https://YOUR_RENDER_URL/book", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({
-      time: time,
-      token: userToken
-    })
-  });
+        // Step 4: Send everything to your backend
+        const response = await fetch(`${BACKEND_URL}/book`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, datetime, fcmToken })
+        });
 
-  alert("Rendez-vous enregistré !");
-}
-</script>
+        const result = await response.json();
+
+        if (result.success) {
+          showStatus('Appointment booked! You will get a reminder 30 minutes before.', 'success');
+        } else {
+          showStatus('Something went wrong. Please try again.', 'error');
+        }
+
+      } catch (err) {
+        console.error(err);
+        showStatus('Error: ' + err.message, 'error');
+      }
+    };
+
+    function showStatus(msg, type) {
+      const el = document.getElementById('status');
+      el.textContent = msg;
+      el.className = type;
+      el.style.display = 'block';
+    }
+  </script>
 
 </body>
 </html>
