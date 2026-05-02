@@ -1,12 +1,18 @@
-// This file must be at the root of your site
+self.addEventListener('install', function(event) {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', function(event) {
+  event.waitUntil(clients.claim());
+});
+
 self.addEventListener('push', function(event) {
   const data = event.data ? event.data.json() : {};
 
   const title = data.title || 'Reminder';
   const options = {
     body: data.body || 'You have an upcoming appointment',
-    icon: '/icon.png',
-    badge: '/icon.png'
+    icon: '/sms/icon.png'
   };
 
   event.waitUntil(
@@ -17,6 +23,6 @@ self.addEventListener('push', function(event) {
 self.addEventListener('notificationclick', function(event) {
   event.notification.close();
   event.waitUntil(
-    clients.openWindow('/')
+    clients.openWindow('/sms/')
   );
 });
