@@ -1,54 +1,40 @@
-const express = require("express");
-const admin = require("firebase-admin");
-const cors = require("cors");
+const express = require('express');
+const admin = require('firebase-admin');
+const cors = require('cors');
 
-const app = express();
-app.use(cors());
-app.use(express.json());
+// Initialize Firebase Admin using environment variable
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 
-// 🔑 FIREBASE ADMIN (upload JSON from Firebase)
 admin.initializeApp({
-  credential: admin.credential.cert(require("./serviceAccountKey.json"))
+  credential: admin.credential.cert(serviceAccount)
 });
 
 const db = admin.firestore();
+const app = express();
 
-// 📅 Save appointment
-app.post("/book", async (req, res) => {
-  const { time, token } = req.body;
+app.use(cors());
+app.use(express.json());
 
-  await db.collection("appointments").add({
-    time: new Date(time),
-    token: token
-  });
+// Save an appointment
+app.post('/book', async (req, res) => {
+  try {
+    const { name, email, datetime, fcmToken } = req.body;
 
-  res.send("OK");
+    await db.collection('appointments').add({
+      name,
+      email,
+      datetime,          // ISO string e.g. "2025-06-15T14:30:00"
+      fcmToken,          // push token from the user's browser
+      reminderSent: false,
+      createdAt: new Date().toISOString()
+    });
+
+    res.json({ success: true, message: 'Appointment saved!' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Something went wrong' });
+  }
 });
 
-// ⏱️ Check every minute
-setInterval(async () => {
-  const now = new Date();
-
-  const snapshot = await db.collection("appointments").get();
-
-  snapshot.forEach(async doc => {
-    const data = doc.data();
-    const diff = new Date(data.time) - now;
-
-    // 30 minutes
-    if (diff > 0 && diff <= 1800000) {
-      await admin.messaging().send({
-        token: data.token,
-        notification: {
-          title: "Rappel",
-          body: "Votre rendez-vous est dans 30 minutes"
-        }
-      });
-
-      await doc.ref.delete();
-    }
-  });
-}, 60000);
-
-// 🚀 start server
-app.listen(3000, () => console.log("Server running"));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
