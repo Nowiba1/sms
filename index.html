@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Rendez-vous</title>
+</head>
+<body>
+
+<h2>Prendre un rendez-vous</h2>
+
+<input type="datetime-local" id="time">
+<button onclick="book()">Réserver</button>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging.js";
+
+// 🔑 CONFIG FIREBASE (remplace)
+const firebaseConfig = {
+  apiKey: "AIzaSyBaNjHmi-VlW8aFDDVN38OJkQCShYY2sFg",
+  authDomain: "dominos-ftw.firebaseapp.com",
+  databaseURL: "https://dominos-ftw-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "dominos-ftw",
+  storageBucket: "dominos-ftw.firebasestorage.app",
+  messagingSenderId: "476741872461",
+  appId: "1:476741872461:web:3dc979b05a6175eadda504",
+  measurementId: "G-1TBL91595F"
+};
+
+const app = initializeApp(firebaseConfig);
+const messaging = getMessaging(app);
+
+let userToken = null;
+
+// 🔔 demander permission + récupérer token
+async function initPush() {
+  const permission = await Notification.requestPermission();
+
+  if (permission === "granted") {
+    userToken = await getToken(messaging, {
+      vapidKey: "YOUR_VAPID_PUBLIC_KEY"
+    });
+
+    console.log("TOKEN:", userToken);
+  } else {
+    alert("Notifications refusées");
+  }
+}
+
+await initPush();
+
+// 📅 réserver rendez-vous
+window.book = async function () {
+  const time = document.getElementById("time").value;
+
+  if (!time) return alert("Choisir une date");
+
+  await fetch("https://YOUR_RENDER_URL/book", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      time: time,
+      token: userToken
+    })
+  });
+
+  alert("Rendez-vous enregistré !");
+}
+</script>
+
+</body>
+</html>
